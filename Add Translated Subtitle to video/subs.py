@@ -4,6 +4,10 @@
 # FEATURES
 # ---------------------------------------------------------
 # ✔ Auto language detection
+# ✔ Confirmation before using detected language
+# ✔ Manual language override
+# ✔ Redo transcription support
+# ✔ Redo with different language code
 # ✔ Whisper transcription
 # ✔ Automatic translation
 # ✔ Manual translation mode
@@ -220,8 +224,6 @@ def burn_subtitles(
 
     filters = []
 
-    # translated subs (bottom center)
-
     translated_style = build_subtitle_style(
         font_size,
         primary_color,
@@ -237,8 +239,6 @@ def burn_subtitles(
         f"subtitles='{translated_escaped}':"
         f"force_style='{translated_style}'"
     )
-
-    # original subs (top center)
 
     if burn_original_top and original_srt:
 
@@ -533,8 +533,6 @@ def translate_batch(texts, target_lang):
 
             warn(f"Batch failed: {e}")
 
-        # fallback line-by-line
-
         for idx, text in enumerate(batch, start=1):
 
             success = False
@@ -634,72 +632,127 @@ def manual_translation_workflow(
     transcript_path,
 ):
 
-    section("Manual Translation Mode")
-
-    original_lines = [
-        seg["text"].strip()
-        for seg in raw_segments
-    ]
-
-    with open(
-        transcript_path,
-        "w",
-        encoding="utf-8"
-    ) as f:
-
-        for line in original_lines:
-            f.write(line + "\n")
-
-    ok(f"Transcript saved:\n{transcript_path}")
-
-    print()
-    hr()
-
-    print(
-        "COPY EVERYTHING BELOW INTO GOOGLE TRANSLATE"
-    )
-
-    hr()
-    print()
-
-    for line in original_lines:
-        print(line)
-
-    print()
-    hr()
-
-    print("AFTER TRANSLATING:")
-    print("1. Copy translated text")
-    print("2. Paste below")
-    print("3. Type END on its own line")
-
-    hr()
-    print()
-
-    translated_lines = []
-
     while True:
 
-        line = input()
+        section("Manual Translation Mode")
 
-        if line.strip() == "END":
-            break
+        original_lines = [
+            seg["text"].strip()
+            for seg in raw_segments
+        ]
 
-        translated_lines.append(line)
+        with open(
+            transcript_path,
+            "w",
+            encoding="utf-8"
+        ) as f:
 
-    if len(translated_lines) != len(raw_segments):
+            for line in original_lines:
+                f.write(line + "\n")
 
-        warn(
-            f"Line count mismatch\n"
-            f"Expected: {len(raw_segments)}\n"
-            f"Received: {len(translated_lines)}"
-        )
+        ok(f"Transcript saved:\n{transcript_path}")
 
-        sys.exit(1)
+        print()
+        hr()
 
-    ok("Manual translation received")
+        print("TRANSCRIPTION COMPLETE")
 
-    return translated_lines
+        hr()
+
+        print()
+        print("1. Continue and paste translated text")
+        print("2. Redo transcription")
+        print("3. Redo with different language code")
+
+        print()
+
+        action = input(
+            "Choice:\n> "
+        ).strip()
+
+        # =============================================
+        # CONTINUE
+        # =============================================
+
+        if action == "1":
+
+            print()
+            hr()
+
+            print(
+                "COPY EVERYTHING BELOW INTO GOOGLE TRANSLATE"
+            )
+
+            hr()
+            print()
+
+            for line in original_lines:
+                print(line)
+
+            print()
+            hr()
+
+            print("AFTER TRANSLATING:")
+            print("1. Copy translated text")
+            print("2. Paste below")
+            print("3. Type END on its own line")
+
+            hr()
+            print()
+
+            translated_lines = []
+
+            while True:
+
+                line = input()
+
+                if line.strip() == "END":
+                    break
+
+                translated_lines.append(line)
+
+            if len(translated_lines) != len(raw_segments):
+
+                warn(
+                    f"Line count mismatch\n"
+                    f"Expected: {len(raw_segments)}\n"
+                    f"Received: {len(translated_lines)}"
+                )
+
+                continue
+
+            ok("Manual translation received")
+
+            return translated_lines
+
+        # =============================================
+        # REDO SAME
+        # =============================================
+
+        elif action == "2":
+
+            return "__REDO__"
+
+        # =============================================
+        # REDO DIFFERENT LANGUAGE
+        # =============================================
+
+        elif action == "3":
+
+            new_lang = input(
+                "Enter new language code:\n> "
+            ).strip()
+
+            if not new_lang:
+
+                warn("No language entered")
+                continue
+
+            return f"__REDO_LANG__:{new_lang}"
+
+        else:
+
+            warn("Invalid choice")
 
 # =========================================================
 # MAIN
@@ -713,10 +766,6 @@ def main():
     print("Universal Subtitle Generator")
 
     hr("═")
-
-    # =====================================================
-    # INPUT
-    # =====================================================
 
     section("Input Video")
 
@@ -735,10 +784,6 @@ def main():
 
     ok(video_path)
 
-    # =====================================================
-    # TARGET LANGUAGE
-    # =====================================================
-
     section("Target Language")
 
     lang_choice = pick_option(
@@ -751,10 +796,6 @@ def main():
     )
 
     ok(f"{target_name} ({target_code})")
-
-    # =====================================================
-    # TRANSLATION MODE
-    # =====================================================
 
     section("Translation Mode")
 
@@ -782,19 +823,11 @@ def main():
 
     ok(f"Mode: {translation_mode}")
 
-    # =====================================================
-    # BILINGUAL SUBS
-    # =====================================================
-
     section("Bilingual Subtitles")
 
     burn_original_top = yes_no(
         "Also burn ORIGINAL subtitles at TOP CENTER?"
     )
-
-    # =====================================================
-    # APPEARANCE
-    # =====================================================
 
     section("Subtitle Appearance")
 
@@ -818,10 +851,6 @@ def main():
 
     ok(color_name)
 
-    # =====================================================
-    # MODEL
-    # =====================================================
-
     section("Whisper Model")
 
     model_choice = pick_option(
@@ -834,10 +863,6 @@ def main():
     ][1]
 
     ok(model_name)
-
-    # =====================================================
-    # HARDWARE
-    # =====================================================
 
     section("Hardware")
 
@@ -864,10 +889,6 @@ def main():
         device = "cpu"
         compute_type = "int8"
 
-    # =====================================================
-    # LOAD MODEL
-    # =====================================================
-
     section("Loading Model")
 
     from faster_whisper import WhisperModel
@@ -879,10 +900,6 @@ def main():
     )
 
     ok("Model loaded")
-
-    # =====================================================
-    # LANGUAGE DETECTION
-    # =====================================================
 
     section("Language Detection")
 
@@ -899,110 +916,180 @@ def main():
         f"({confidence:.0%})"
     )
 
-    # =====================================================
-    # TRANSCRIBE
-    # =====================================================
+    print()
+    print("Detected language code:", detected_lang)
 
-    section("Transcribing")
-
-    segments_gen, _ = model.transcribe(
-        video_path,
-        beam_size=5,
-        vad_filter=True,
-        language=detected_lang,
+    use_detected = yes_no(
+        f"Use detected language '{detected_lang}'?"
     )
 
-    raw_segments = []
+    if use_detected:
 
-    for seg in segments_gen:
-
-        text = seg.text.strip()
-
-        raw_segments.append({
-            "start": seg.start,
-            "end": seg.end,
-            "text": text,
-        })
-
-        print(
-            f"[{seg.start:7.2f}s → "
-            f"{seg.end:7.2f}s]"
-        )
-
-        print("TEXT:", text)
-        print()
-
-    if not raw_segments:
-
-        warn("No speech found")
-        sys.exit(1)
-
-    # =====================================================
-    # OUTPUT PATHS
-    # =====================================================
-
-    output_dir = Path(video_path).parent
-
-    stem = Path(video_path).stem
-
-    model_safe = model_name.replace("/", "-")
-
-    transcript_txt = str(
-        output_dir /
-        f"{stem}.{model_safe}.transcript.txt"
-    )
-
-    translated_srt = str(
-        output_dir /
-        f"{stem}.{model_safe}.{target_code}.srt"
-    )
-
-    original_srt = str(
-        output_dir /
-        f"{stem}.{model_safe}.original.srt"
-    )
-
-    output_video = str(
-        output_dir /
-        f"{stem}.{model_safe}.subtitled.mp4"
-    )
-
-    # =====================================================
-    # TRANSLATION
-    # =====================================================
-
-    same_lang = (
-        normalize_lang(detected_lang).split("-")[0]
-        ==
-        normalize_lang(target_code).split("-")[0]
-    )
-
-    if same_lang:
-
-        translated_texts = [
-            s["text"]
-            for s in raw_segments
-        ]
+        transcription_lang = detected_lang
 
     else:
 
+        print()
+        print("Examples:")
+        print("en = English")
+        print("zh = Chinese")
+        print("ja = Japanese")
+        print("hi = Hindi")
+        print("ko = Korean")
+        print("es = Spanish")
+
+        print()
+
+        manual_lang = input(
+            "Enter language code:\n> "
+        ).strip()
+
+        if not manual_lang:
+
+            warn("No language entered")
+            sys.exit(1)
+
+        transcription_lang = manual_lang
+
+        ok(
+            f"Using manual language: "
+            f"{transcription_lang}"
+        )
+
+    # =====================================================
+    # TRANSCRIPTION LOOP
+    # =====================================================
+
+    while True:
+
+        section("Transcribing")
+
+        segments_gen, _ = model.transcribe(
+            video_path,
+            beam_size=5,
+            vad_filter=True,
+            language=transcription_lang,
+        )
+
+        raw_segments = []
+
+        for seg in segments_gen:
+
+            text = seg.text.strip()
+
+            raw_segments.append({
+                "start": seg.start,
+                "end": seg.end,
+                "text": text,
+            })
+
+            print(
+                f"[{seg.start:7.2f}s → "
+                f"{seg.end:7.2f}s]"
+            )
+
+            print("TEXT:", text)
+            print()
+
+        if not raw_segments:
+
+            warn("No speech found")
+            sys.exit(1)
+
+        output_dir = Path(video_path).parent
+
+        stem = Path(video_path).stem
+
+        model_safe = model_name.replace("/", "-")
+
+        transcript_txt = str(
+            output_dir /
+            f"{stem}.{model_safe}.transcript.txt"
+        )
+
+        translated_srt = str(
+            output_dir /
+            f"{stem}.{model_safe}.{target_code}.srt"
+        )
+
+        original_srt = str(
+            output_dir /
+            f"{stem}.{model_safe}.original.srt"
+        )
+
+        output_video = str(
+            output_dir /
+            f"{stem}.{model_safe}.subtitled.mp4"
+        )
+
+        # =================================================
+        # AUTO TRANSLATION
+        # =================================================
+
         if translation_mode == "auto":
 
-            section("Translating")
-
-            translated_texts = translate_batch(
-                [s["text"] for s in raw_segments],
-                target_code,
+            same_lang = (
+                normalize_lang(transcription_lang).split("-")[0]
+                ==
+                normalize_lang(target_code).split("-")[0]
             )
+
+            if same_lang:
+
+                translated_texts = [
+                    s["text"]
+                    for s in raw_segments
+                ]
+
+            else:
+
+                section("Translating")
+
+                translated_texts = translate_batch(
+                    [s["text"] for s in raw_segments],
+                    target_code,
+                )
+
+            break
+
+        # =================================================
+        # MANUAL TRANSLATION
+        # =================================================
 
         else:
 
-            translated_texts = (
-                manual_translation_workflow(
-                    raw_segments,
-                    transcript_txt,
-                )
+            result = manual_translation_workflow(
+                raw_segments,
+                transcript_txt,
             )
+
+            if result == "__REDO__":
+
+                info("Redoing transcription...")
+                continue
+
+            elif str(result).startswith(
+                "__REDO_LANG__:"
+            ):
+
+                transcription_lang = (
+                    result.replace(
+                        "__REDO_LANG__:",
+                        ""
+                    )
+                )
+
+                info(
+                    f"Redoing with language: "
+                    f"{transcription_lang}"
+                )
+
+                continue
+
+            else:
+
+                translated_texts = result
+                break
 
     # =====================================================
     # FINAL SEGMENTS
@@ -1040,10 +1127,6 @@ def main():
 
         print()
 
-    # =====================================================
-    # WRITE SRT
-    # =====================================================
-
     section("Writing SRT")
 
     create_srt(
@@ -1058,10 +1141,6 @@ def main():
 
     ok(translated_srt)
 
-    # =====================================================
-    # BURN SUBTITLES
-    # =====================================================
-
     burn_subtitles(
         video_path,
         translated_srt,
@@ -1071,10 +1150,6 @@ def main():
         primary_color,
         burn_original_top,
     )
-
-    # =====================================================
-    # DONE
-    # =====================================================
 
     print()
     hr("═")
